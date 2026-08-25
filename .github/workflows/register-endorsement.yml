@@ -5,6 +5,11 @@ name: Register Merged Endorsement
 on:
   pull_request_target:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Merged endorsement PR number to (re-)register"
+        required: true
 
 permissions:
   contents: read
@@ -18,21 +23,39 @@ jobs:
   endorse:
     # Secrets are only used after a PR has been merged into the default branch.
     if: >-
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == github.event.repository.default_branch
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == github.event.repository.default_branch)
     runs-on: ubuntu-latest
 
     steps:
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")"
+          default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          if [ "$(jq -r '.merged' <<< "$pr_json")" != "true" ] || \
+             [ "$(jq -r '.base.ref' <<< "$pr_json")" != "$default_branch" ]; then
+            echo "PR #${PR_NUMBER} is not a merged PR into the default branch." >&2
+            exit 1
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "merge_sha=$(jq -r '.merge_commit_sha' <<< "$pr_json")" >> "$GITHUB_OUTPUT"
+
       - name: Check out the merged revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ steps.pr.outputs.merge_sha }}
 
       - name: Locate the new endorsement request
         id: request
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           set -euo pipefail
           request_file="$(
@@ -49,7 +72,7 @@ jobs:
         id: prior
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           set -euo pipefail
           comments="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --jq '.[].body')"
@@ -70,7 +93,7 @@ jobs:
         if: steps.prior.outputs.registered != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
           REQUEST_FILE: ${{ steps.request.outputs.file }}
         run: |
           gh pr comment "$PR_NUMBER" --body "<!-- arxiv-endorsement-registered -->
