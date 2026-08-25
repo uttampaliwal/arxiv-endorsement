@@ -1,7 +1,9 @@
 name: Register Merged Endorsement
 
+# pull_request_target (not pull_request) so secrets are available; safe because the
+# job only runs post-merge, on code a maintainer already reviewed and merged.
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
 
 permissions:
