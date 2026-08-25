@@ -1,0 +1,4 @@
+LinkedIn: https://www.linkedin.com/in/pruthviraja/
+Paper: https://raw.githubusercontent.com/astraverse-io/kubeastra-bench/main/paper-C1.pdf
+Subject: cs.SE
+EndorsementCode: IT69ZI
