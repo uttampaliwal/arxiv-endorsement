@@ -1,0 +1,4 @@
+LinkedIn: https://www.linkedin.com/in/uttampaliwal
+Paper: https://raw.githubusercontent.com/uttampaliwal/power-price-predictor/main/main.pdf
+Subject: q-fin.TR
+EndorsementCode: M6AS8T
